@@ -9,12 +9,14 @@ class GSPAuction(Mechanism):
     """Generalized Second-Price (GSP) Keyword Auction
 
     n bidders compete for n-1 slots ranked by click-through rate (CTR).
-    Bidder at rank k (0-indexed, descending bid order) wins slot k with
-    allocation click_probs[k] and pays max(reserve_price, bid of rank k+1).
+    A bidder must bid at least the reserve price to be eligible. Bidder at
+    rank k (0-indexed, descending bid order) wins slot k with allocation
+    click_probs[k] and pays max(reserve_price, bid of rank k+1).
 
     Parameter Utility (param_util):
         click_probs     List[float]: CTR per slot, length n_bidder - 1 (required)
-        reserve_price   float: minimum payment for winners. Defaults to 0.
+        reserve_price   float: minimum qualifying bid and winner payment.
+                        Defaults to 0.
         tie_breaking    str: "lose" (default) or "random"
     """
 
@@ -53,7 +55,10 @@ class GSPAuction(Mechanism):
         rank = (other_bids > bids[idx]).sum(axis=0)  # 0-indexed rank of bidder idx
         click_arr = np.array(self.click_probs)
         rank_clipped = np.minimum(rank, self.n_slots - 1)
-        return np.where(rank < self.n_slots, click_arr[rank_clipped], 0.0)
+        qualifies = bids[idx] >= self.reserve_price
+        return np.where(
+            qualifies & (rank < self.n_slots), click_arr[rank_clipped], 0.0
+        )
 
     def get_payment(
         self, bids: np.ndarray, allocation: np.ndarray, idx: int

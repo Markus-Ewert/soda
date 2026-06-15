@@ -10,6 +10,6 @@ param_util:
   tie_breaking: 'lose'
   # The zero-CTR position pads the implementation's n_bidder - 1 slot vector.
   click_probs: [1.0, 0.8, 0.6, 0.0]
-  reserve_price: 0.0
+  reserve_price: 0.1
 n: 64
 m: 64

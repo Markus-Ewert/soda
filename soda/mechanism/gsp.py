@@ -1,8 +1,11 @@
+from math import comb
 from typing import Dict, List
 
 import numpy as np
 
+from soda.game import Game
 from soda.mechanism.mechanism import Mechanism
+from soda.strategy import Strategy
 
 
 class GSPAuction(Mechanism):
@@ -31,6 +34,7 @@ class GSPAuction(Mechanism):
         super().__init__(bidder, o_space, a_space, param_prior, param_util)
         self.name = "gsp_auction"
         self.check_param()
+        self.check_own_gradient()
 
     def utility(
         self, obs_profile: np.ndarray, bids_profile: np.ndarray, index_bidder: int
@@ -85,6 +89,59 @@ class GSPAuction(Mechanism):
         payment = other_bids_sorted[rank_clipped, np.arange(n_bid_combos)]
         payment = np.maximum(payment, self.reserve_price)
         return payment * (allocation > 0).astype(float)
+
+    def compute_gradient(
+        self, game: Game, strategies: Dict[str, Strategy], agent: str
+    ) -> np.ndarray:
+        """Compute the exact gradient for symmetric independent bidders."""
+        strategy = strategies[agent]
+        bid_pdf = strategy.x.sum(axis=tuple(range(strategy.dim_o)))
+        bid_cdf = bid_pdf.cumsum(dtype=game.dtype)
+        payments = np.maximum(strategy.a_discr, self.reserve_price)
+        n_opponents = game.n_bidder - 1
+        prob_above = 1.0 - bid_cdf
+        allocation_weight = np.zeros(game.m, dtype=game.dtype)
+        payment_weight = np.zeros(game.m, dtype=game.dtype)
+
+        for rank, click_prob in enumerate(self.click_probs):
+            if click_prob == 0:
+                continue
+
+            n_below = n_opponents - rank
+            rank_factor = comb(n_opponents, rank) * prob_above**rank
+            cdf_power = bid_cdf**n_below
+            max_bid_pdf = np.diff(
+                np.concatenate([np.zeros(1, dtype=game.dtype), cdf_power])
+            )
+            expected_max_payment = np.cumsum(
+                max_bid_pdf * payments, dtype=game.dtype
+            )
+
+            allocation_weight += (
+                click_prob * rank_factor * cdf_power
+            )
+            payment_weight += (
+                click_prob * rank_factor * expected_max_payment
+            )
+
+        qualifies = strategy.a_discr >= self.reserve_price
+        allocation_weight *= qualifies
+        payment_weight *= qualifies
+        return np.asarray(
+            strategy.o_discr.reshape(game.n, 1)
+            * allocation_weight.reshape(1, game.m)
+            - payment_weight.reshape(1, game.m),
+            dtype=game.dtype,
+        )
+
+    def check_own_gradient(self):
+        """Enable the exact fast path for symmetric independent bidders."""
+        self.own_gradient = (
+            len(self.set_bidder) == 1
+            and "corr" not in self.param_prior
+            and self.tie_breaking == "lose"
+            and self.value_model == "private"
+        )
 
     def check_param(self):
         if "tie_breaking" not in self.param_util:

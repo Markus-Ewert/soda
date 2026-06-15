@@ -1,7 +1,10 @@
 import numpy as np
 import pytest
 
+from soda.game import Game
+from soda.learner.gradient import Gradient
 from soda.mechanism.gsp import GSPAuction
+from soda.strategy import Strategy
 
 
 @pytest.fixture
@@ -47,3 +50,19 @@ def test_qualifying_winner_pays_at_least_reserve(mechanism):
     payment = mechanism.get_payment(bids, allocation, idx=0)
 
     assert np.allclose(payment, [0.4, 0.7])
+
+
+def test_own_gradient_matches_utility_tensor(mechanism):
+    assert mechanism.own_gradient
+    mechanism.own_gradient = False
+    game = Game(mechanism, n=5, m=6)
+    game.get_utility()
+    strategies = {"1": Strategy("1", game)}
+    strategies["1"].initialize("random")
+
+    generic_gradient = Gradient()
+    generic_gradient.prepare(game, strategies)
+    expected = generic_gradient.compute(game, strategies, "1")
+    actual = mechanism.compute_gradient(game, strategies, "1")
+
+    assert np.allclose(actual, expected, atol=5e-7)

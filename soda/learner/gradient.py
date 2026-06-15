@@ -19,6 +19,8 @@ class Gradient:
     def __init__(self) -> None:
         self.path = {}
         self.indices = {}
+        self.utility_matrix = {}
+        self.gradient_shape = {}
 
     def compute(
         self, game: Game, strategies: Dict[str, Strategy], agent: str
@@ -39,14 +41,34 @@ class Gradient:
 
             # bidders observations/valuations are independent
             if game.weights is None:
-                return np.einsum(
-                    self.indices[agent],
-                    *[game.utility[agent]]
-                    + [
-                        strategies[i].x.sum(axis=tuple(range(strategies[i].dim_o)))
-                        for i in opp
-                    ],
-                    optimize=self.path[agent]
+                idx_agent = game.bidder.index(agent)
+                idx_opp = [
+                    i for i in range(game.n_bidder) if i != idx_agent
+                ]
+                marginal_cache = {}
+                joint_marginal = None
+
+                for idx in idx_opp:
+                    bidder = game.bidder[idx]
+                    strategy = strategies[bidder]
+                    if bidder not in marginal_cache:
+                        marginal_cache[bidder] = strategy.x.sum(
+                            axis=tuple(range(strategy.dim_o))
+                        )
+                    marginal = marginal_cache[bidder]
+                    joint_marginal = (
+                        marginal
+                        if joint_marginal is None
+                        else np.multiply.outer(joint_marginal, marginal)
+                    )
+
+                if joint_marginal is None:
+                    joint_marginal = np.ones(1)
+                gradient = self.utility_matrix[agent] @ joint_marginal.reshape(-1)
+                gradient = gradient.reshape(self.gradient_shape[agent])
+                return gradient.transpose(
+                    tuple(range(strategies[agent].dim_a, gradient.ndim))
+                    + tuple(range(strategies[agent].dim_a))
                 )
             # bidders observations/valuations are correlated
             else:
@@ -115,6 +137,29 @@ class Gradient:
                 )
 
                 if ind:
+                    action_axes_agent = list(
+                        range(idx * dim_a, (idx + 1) * dim_a)
+                    )
+                    observation_axes = list(
+                        range(n_bidder * dim_a, game.utility[i].ndim)
+                    )
+                    action_axes_opp = [
+                        axis
+                        for axis in range(n_bidder * dim_a)
+                        if axis not in action_axes_agent
+                    ]
+                    utility_order = (
+                        action_axes_agent + observation_axes + action_axes_opp
+                    )
+                    output_shape = tuple(
+                        game.utility[i].shape[axis]
+                        for axis in action_axes_agent + observation_axes
+                    )
+                    self.utility_matrix[i] = game.utility[i].transpose(
+                        utility_order
+                    ).reshape(np.prod(output_shape), -1)
+                    self.gradient_shape[i] = output_shape
+
                     # valuations are independent
                     self.indices[i] = (
                         start

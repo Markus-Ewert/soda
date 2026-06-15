@@ -1,4 +1,3 @@
-from itertools import product
 from typing import List
 
 import numpy as np
@@ -86,17 +85,35 @@ class Game:
         For each agent an array is stored which contains all possible combinations of
         observations/valuations and bid profiles
         """
+        bids = self.create_all_bid_profiles()
+        valuations = self.get_obs_profile_reshaped()
+        shape_utilities = self.get_shape_utilities()
+
         for i in self.set_bidder:
             index_bidder = self.bidder.index(i)
-            bids = self.create_all_bid_profiles()
-            valuations = self.get_obs_profile_reshaped()
-            shape_utilities = self.get_shape_utilities()
-
-            self.utility[i] = (
+            utility = (
                 self.mechanism.utility(valuations, bids, index_bidder)
                 .transpose()
                 .reshape(shape_utilities)
             )
+            if self.weights is None and not self.mechanism.own_gradient:
+                action_axes = list(
+                    range(index_bidder * self.dim_a, (index_bidder + 1) * self.dim_a)
+                )
+                observation_axes = list(
+                    range(self.n_bidder * self.dim_a, utility.ndim)
+                )
+                opponent_axes = [
+                    axis
+                    for axis in range(self.n_bidder * self.dim_a)
+                    if axis not in action_axes
+                ]
+                storage_order = action_axes + observation_axes + opponent_axes
+                inverse_order = np.argsort(storage_order)
+                utility = np.ascontiguousarray(
+                    utility.transpose(storage_order)
+                ).transpose(inverse_order)
+            self.utility[i] = utility
 
     def create_all_bid_profiles(self) -> np.ndarray:
         """
@@ -105,40 +122,24 @@ class Game:
         Returns:
             np.ndarray
         """
-        if self.dim_a == 1:
-            return np.array(
-                [
-                    np.array(
-                        [
-                            self.a_discr[self.bidder[k]][j[k]]
-                            for j in product(range(self.m), repeat=self.n_bidder)
-                        ]
-                    )
-                    for k in range(self.n_bidder)
-                ]
-            )
-        else:
-            return np.array(
-                [
-                    np.array(
-                        [
-                            np.array(
-                                [
-                                    self.a_discr[self.bidder[i]][k][
-                                        j[self.dim_a * i + k]
-                                    ]
-                                    for j in product(
-                                        range(self.m),
-                                        repeat=self.n_bidder * self.dim_a,
-                                    )
-                                ]
-                            )
-                            for k in range(self.dim_a)
-                        ]
-                    )
-                    for i in range(self.n_bidder)
-                ]
-            )
+        n_axes = self.n_bidder * self.dim_a
+        n_profiles = self.m**n_axes
+        profile = np.arange(n_profiles)
+        bids = np.empty((self.n_bidder, self.dim_a, n_profiles))
+
+        for i in range(self.n_bidder):
+            for k in range(self.dim_a):
+                axis = i * self.dim_a + k
+                stride = self.m ** (n_axes - axis - 1)
+                indices = profile // stride % self.m
+                action_discr = (
+                    self.a_discr[self.bidder[i]]
+                    if self.dim_a == 1
+                    else self.a_discr[self.bidder[i]][k]
+                )
+                bids[i, k] = action_discr[indices]
+
+        return bids[:, 0] if self.dim_a == 1 else bids
 
     def get_obs_profile_reshaped(self) -> np.ndarray:
         """Due to the quasi-linear structure of the utility function, we compute the utility for one bid profile and several valuations in one step.

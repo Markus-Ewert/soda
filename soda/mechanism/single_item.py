@@ -477,12 +477,16 @@ class SingleItemAuction(Mechanism):
             np.ndarray: gradient for agent
         """
         value_grid = (
-            np.ones((strategies[agent].m, strategies[agent].n))
+            np.ones(
+                (strategies[agent].m, strategies[agent].n), dtype=game.dtype
+            )
             * strategies[agent].o_discr
         ).T
 
         payment_grid = np.clip(
-            np.ones((strategies[agent].n, strategies[agent].m))
+            np.ones(
+                (strategies[agent].n, strategies[agent].m), dtype=game.dtype
+            )
             * strategies[agent].a_discr,
             self.reserve_price,
             None,
@@ -501,10 +505,19 @@ class SingleItemAuction(Mechanism):
             payoff = self.get_payoff(
                 allocation_grid, value_grid, payment_grid, index_bidder=0
             )
-            prob_grid = np.ones((strategies[agent].n, strategies[agent].m)) * pdf_order
-            return np.hstack([np.zeros((strategies[agent].n, 1)), payoff * prob_grid])[
-                :, :-1
-            ].cumsum(axis=1)
+            prob_grid = (
+                np.ones(
+                    (strategies[agent].n, strategies[agent].m),
+                    dtype=game.dtype,
+                )
+                * pdf_order
+            )
+            return np.hstack(
+                [
+                    np.zeros((strategies[agent].n, 1), dtype=game.dtype),
+                    payoff * prob_grid,
+                ]
+            )[:, :-1].cumsum(axis=1, dtype=game.dtype)
 
         else:
             raise ValueError(

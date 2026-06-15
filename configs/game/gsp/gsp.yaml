@@ -1,5 +1,5 @@
 mechanism: soda.mechanism.gsp.GSPAuction
-bidder: ['1', '1', '1']
+bidder: ['1', '1', '1', '1', '1']
 o_space:
   '1': [0.0, 1.0]
 a_space:
@@ -8,7 +8,8 @@ param_prior:
   distribution: 'uniform'
 param_util:
   tie_breaking: 'lose'
-  click_probs: [1.0, 0.5]
+  # The zero-CTR position pads the implementation's n_bidder - 1 slot vector.
+  click_probs: [1.0, 0.8, 0.6, 0.0]
   reserve_price: 0.0
 n: 64
 m: 64

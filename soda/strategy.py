@@ -50,9 +50,10 @@ class Strategy:
         self.prior = game.prior[agent]
 
         # strategy - primal iterate
-        self.x = -np.ones(tuple([game.n] * self.dim_o + [game.m] * self.dim_a)) / (
-            game.n**self.dim_o * game.m * self.dim_a
-        )
+        self.x = -np.ones(
+            tuple([game.n] * self.dim_o + [game.m] * self.dim_a),
+            dtype=game.dtype,
+        ) / (game.n**self.dim_o * game.m * self.dim_a)
         # strategy - dual iterate
         self.y = np.zeros_like(self.x)
 
@@ -96,15 +97,19 @@ class Strategy:
         self.prepare_history(max_iter=2, save_history=True)
 
         if init_method == "random":
-            sigma = np.random.uniform(0, 1, size=self.x.shape)
+            sigma = np.random.uniform(0, 1, size=self.x.shape).astype(
+                self.game.dtype
+            )
 
         elif init_method == "nan":
-            sigma = np.nan * np.ones(self.x.shape)
+            sigma = np.full(self.x.shape, np.nan, dtype=self.game.dtype)
 
         elif init_method == "random_no_overbid":
             if self.dim_o == self.dim_a == 1:
                 aa, oo = np.meshgrid(self.a_discr, self.o_discr)
-                sigma = np.random.uniform(0, 1, size=self.x.shape)
+                sigma = np.random.uniform(0, 1, size=self.x.shape).astype(
+                    self.game.dtype
+                )
                 sigma[np.array(oo < aa)] = lower_bound
             else:
                 raise NotImplementedError(
@@ -112,7 +117,7 @@ class Strategy:
                 )
 
         elif init_method == "equal":
-            sigma = np.ones(self.x.shape)
+            sigma = np.ones(self.x.shape, dtype=self.game.dtype)
 
         elif init_method == "truthful":
             if self.dim_o == self.dim_a == 1:
@@ -124,7 +129,8 @@ class Strategy:
                             for j in np.linspace(0, 1, m)
                         ]
                         for i in np.linspace(0, 1, n)
-                    ]
+                    ],
+                    dtype=self.game.dtype,
                 )
             else:
                 raise NotImplementedError("truthful only implement for 1-dim case")
@@ -139,7 +145,8 @@ class Strategy:
                             for j in np.linspace(0, 1, m)
                         ]
                         for i in np.linspace(1, 0, n)
-                    ]
+                    ],
+                    dtype=self.game.dtype,
                 )
 
         elif init_method == "function":
@@ -171,7 +178,9 @@ class Strategy:
                     == self.n**self.dim_o * self.m**self.dim_a
                 )
             ):
-                sigma = param["init_matrix"]
+                sigma = np.asarray(
+                    param["init_matrix"], dtype=self.game.dtype
+                )
             else:
                 raise ValueError("Dimension of matrix is not as expected")
 

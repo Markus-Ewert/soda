@@ -274,17 +274,23 @@ class AllPayAuction(Mechanism):
         """
         prob_win = compute_probability_winning(game, strategies, agent, zero_wins=True)
         obs_grid = (
-            np.ones((strategies[agent].m, strategies[agent].n))
+            np.ones(
+                (strategies[agent].m, strategies[agent].n), dtype=game.dtype
+            )
             * strategies[agent].o_discr
         ).T
         bid_grid = (
-            np.ones((strategies[agent].n, strategies[agent].m))
+            np.ones(
+                (strategies[agent].n, strategies[agent].m), dtype=game.dtype
+            )
             * strategies[agent].a_discr
         )
-        return prob_win * self.get_payoff(
-            np.ones_like(obs_grid), obs_grid, bid_grid
-        ) + (1 - prob_win) * self.get_payoff(
-            np.zeros_like(obs_grid), obs_grid, bid_grid
+        return np.asarray(
+            prob_win
+            * self.get_payoff(np.ones_like(obs_grid), obs_grid, bid_grid)
+            + (1 - prob_win)
+            * self.get_payoff(np.zeros_like(obs_grid), obs_grid, bid_grid),
+            dtype=game.dtype,
         )
 
     # -------------------------- methods to test input ------------------------------- #

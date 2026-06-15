@@ -205,7 +205,8 @@ class Crowdsourcing(Mechanism):
                 * cdf[:-1] ** (self.n_bidder - r - 1)
                 * (1 - cdf[1:]) ** r
                 for r in range(sum(self.prices > 0))
-            ]
+            ],
+            dtype=game.dtype,
         ).sum(axis=0)
 
         if self.type == "cost":
@@ -214,7 +215,7 @@ class Crowdsourcing(Mechanism):
                 .o_discr.reshape(game.n, 1)
                 .dot(strategies[agent].a_discr.reshape(1, game.m))
             )
-            return exp_win - payment
+            return np.asarray(exp_win - payment, dtype=game.dtype)
 
         elif self.type == "value":
             exp_win_val = (
@@ -222,10 +223,10 @@ class Crowdsourcing(Mechanism):
                 .o_discr.reshape(strategies[agent].n, 1)
                 .dot(exp_win.reshape(1, game.m))
             )
-            payment = np.ones((game.n, 1)).dot(
+            payment = np.ones((game.n, 1), dtype=game.dtype).dot(
                 strategies[agent].a_discr.reshape(1, game.m)
             )
-            return exp_win_val - payment
+            return np.asarray(exp_win_val - payment, dtype=game.dtype)
 
         else:
             raise ValueError("util_type in param_util unknown")

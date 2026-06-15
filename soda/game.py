@@ -37,6 +37,7 @@ class Game:
         self.mechanism = mechanism
         self.n = n
         self.m = m
+        self.dtype = np.float32
 
         self.name = mechanism.name
         self.bidder = mechanism.bidder
@@ -74,7 +75,10 @@ class Game:
         # marginal prior for bidder
         self.prior = {i: self.get_prior(i) for i in self.set_bidder}
 
-        self.weights = self.get_weights(mechanism)
+        weights = self.get_weights(mechanism)
+        self.weights = (
+            None if weights is None else np.asarray(weights, dtype=self.dtype)
+        )
         self.utility = {}
 
     def __repr__(self) -> str:
@@ -95,6 +99,7 @@ class Game:
                 self.mechanism.utility(valuations, bids, index_bidder)
                 .transpose()
                 .reshape(shape_utilities)
+                .astype(self.dtype, copy=False)
             )
             if self.weights is None and not self.mechanism.own_gradient:
                 action_axes = list(
@@ -125,7 +130,9 @@ class Game:
         n_axes = self.n_bidder * self.dim_a
         n_profiles = self.m**n_axes
         profile = np.arange(n_profiles)
-        bids = np.empty((self.n_bidder, self.dim_a, n_profiles))
+        bids = np.empty(
+            (self.n_bidder, self.dim_a, n_profiles), dtype=self.dtype
+        )
 
         for i in range(self.n_bidder):
             for k in range(self.dim_a):
@@ -216,10 +223,10 @@ class Game:
             np.ndarray: discretized prior for agent
         """
         if self.o_discr[agent].size == 1:
-            p = np.array([1])
+            p = np.array([1], dtype=self.dtype)
         else:
             p = marginal_prior_pdf(self.mechanism, self.o_discr[agent], agent)
-        return p / p.sum()
+        return np.asarray(p / p.sum(), dtype=self.dtype)
 
     def get_weights(self, mechanism):
         return compute_weights(self, mechanism)
@@ -242,7 +249,8 @@ class Game:
                 [
                     Game.discr_interval(interv[0], interv[1], n_discrete, midpoint)
                     for interv in interval
-                ]
+                ],
+                dtype=np.float32,
             )
         else:
             return Game.discr_interval(interval[0], interval[1], n_discrete, midpoint)
@@ -266,13 +274,17 @@ class Game:
                 "if you choose same lower and upper bound, n_discrete must be 1 (and vice versa)"
             )
         if midpoint:
-            return (
+            return np.asarray(
                 lower_bound
                 + (0.5 + np.arange(n_discrete))
                 * (upper_bound - lower_bound)
-                / n_discrete
+                / n_discrete,
+                dtype=np.float32,
             )
         else:
-            return lower_bound + (np.arange(n_discrete)) * (
-                upper_bound - lower_bound
-            ) / (n_discrete - 1)
+            return np.asarray(
+                lower_bound
+                + (np.arange(n_discrete)) * (upper_bound - lower_bound)
+                / (n_discrete - 1),
+                dtype=np.float32,
+            )

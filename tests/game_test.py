@@ -6,6 +6,7 @@ import pytest
 
 from soda.game import Game
 from soda.mechanism.single_item import SingleItemAuction
+from soda.strategy import Strategy
 
 
 @pytest.fixture
@@ -30,6 +31,20 @@ def test_create_game(get_mechanism):
     assert isinstance(game, Game), "create instance of Game"
     assert len(game.o_discr["1"]) == 7, "discretization points observation space"
     assert len(game.a_discr["1"]) == 9, "discretization points action space"
+    assert game.o_discr["1"].dtype == np.float32
+    assert game.a_discr["1"].dtype == np.float32
+    assert game.prior["1"].dtype == np.float32
+
+
+def test_utility_uses_float32(get_mechanism):
+    game = Game(get_mechanism, 7, 9)
+    game.get_utility()
+    strategy = Strategy("1", game)
+    strategy.initialize("equal")
+
+    assert game.utility["1"].dtype == np.float32
+    assert strategy.x.dtype == np.float32
+    assert strategy.gradient.dtype == np.float32
 
 
 def test_discr_interval():

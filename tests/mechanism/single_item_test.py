@@ -176,5 +176,5 @@ def test_own_gradient(get_mechanism, utility_type, tie_breaking, payment_rule):
         own_gradient = mechanism.compute_gradient(game, strategies, "1")
 
         assert np.allclose(
-            util_gradient, own_gradient
+            util_gradient, own_gradient, atol=5e-7
         ), f"equality gradient, setting: {tie_breaking}, {utility_type}, {payment_rule}"

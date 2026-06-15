@@ -33,7 +33,10 @@ class Gradient:
             agent (str): _description_
         """
         if game.mechanism.own_gradient:
-            return game.mechanism.compute_gradient(game, strategies, agent)
+            return np.asarray(
+                game.mechanism.compute_gradient(game, strategies, agent),
+                dtype=game.dtype,
+            )
 
         else:
             opp = game.bidder.copy()
@@ -63,21 +66,27 @@ class Gradient:
                     )
 
                 if joint_marginal is None:
-                    joint_marginal = np.ones(1)
+                    joint_marginal = np.ones(1, dtype=game.dtype)
                 gradient = self.utility_matrix[agent] @ joint_marginal.reshape(-1)
                 gradient = gradient.reshape(self.gradient_shape[agent])
-                return gradient.transpose(
-                    tuple(range(strategies[agent].dim_a, gradient.ndim))
-                    + tuple(range(strategies[agent].dim_a))
+                return np.asarray(
+                    gradient.transpose(
+                        tuple(range(strategies[agent].dim_a, gradient.ndim))
+                        + tuple(range(strategies[agent].dim_a))
+                    ),
+                    dtype=game.dtype,
                 )
             # bidders observations/valuations are correlated
             else:
-                return np.einsum(
-                    self.indices[agent],
-                    *[game.utility[agent]]
-                    + [strategies[i].x for i in opp]
-                    + [game.weights],
-                    optimize=self.path[agent]
+                return np.asarray(
+                    np.einsum(
+                        self.indices[agent],
+                        *[game.utility[agent]]
+                        + [strategies[i].x for i in opp]
+                        + [game.weights],
+                        optimize=self.path[agent],
+                    ),
+                    dtype=game.dtype,
                 )
 
     def prepare(self, game, strategies: Dict) -> None:
